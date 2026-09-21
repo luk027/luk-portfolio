@@ -14,10 +14,12 @@
   "rtl": false,
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils",
     "ui": "@/components/ui",
+    "config": "@/config",
+    "hooks": "@/hooks",
     "lib": "@/lib",
-    "hooks": "@/hooks"
+    "utils": "@/lib/utils",
+    "providers": "@/providers"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

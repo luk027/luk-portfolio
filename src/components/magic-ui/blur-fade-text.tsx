@@ -32,19 +32,27 @@ const BlurFadeText = ({
     visible: { y: 0, opacity: 1, filter: "blur(0px)" },
   };
   const combinedVariants = variant || defaultVariants;
-  const characters = useMemo(() => Array.from(text), [text]);
+  const characters = useMemo(() => {
+    const occurrences = new Map<string, number>();
+
+    return Array.from(text).map((char) => {
+      const occurrence = occurrences.get(char) ?? 0;
+      occurrences.set(char, occurrence + 1);
+      return { char, key: `${char}-${occurrence}` };
+    });
+  }, [text]);
 
   if (animateByCharacter) {
     return (
       <div className="flex">
-        {characters.map((char, i) => {
+        {characters.map(({ char, key }, i) => {
           const charVariants: Variants = {
             hidden: { y: -yOffset, opacity: 0, filter: "blur(8px)" },
             visible: { y: 0, opacity: 1, filter: "blur(0px)" },
           };
           return (
             <motion.span
-              key={i + char}
+              key={key}
               initial="hidden"
               animate="visible"
               variants={charVariants}

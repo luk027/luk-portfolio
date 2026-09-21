@@ -10,7 +10,14 @@ const appEnv: AppEnvironment = appEnvironments.includes(
   configuredAppEnvironment as AppEnvironment,
 )
   ? (configuredAppEnvironment as AppEnvironment)
-  : "development";
+  : ((): AppEnvironment => {
+      if (configuredAppEnvironment) {
+        throw new Error(
+          `Invalid NEXT_PUBLIC_APP_ENV: ${configuredAppEnvironment}`,
+        );
+      }
+      return "development";
+    })();
 
 export const env = {
   appEnv,
