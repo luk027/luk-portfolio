@@ -41,11 +41,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       >
         <ThemeProvider attribute="class" defaultTheme={setDefaultTheme}>
           <TooltipProvider delay={0}>
-            <div className="absolute inset-0 top-0 left-0 right-0 h-25 overflow-hidden z-0">
+            <div className="absolute inset-0 top-0 left-0 right-0 h-28 overflow-hidden z-0">
               <FlickeringGrid
                 className="h-full w-full"
-                squareSize={2}
+                squareSize={4}
                 gridGap={2}
+                color="rgb(128, 128, 128)"
                 style={{
                   maskImage: "linear-gradient(to bottom, black, transparent)",
                   WebkitMaskImage:

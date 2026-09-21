@@ -20,7 +20,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   squareSize = 4,
   gridGap = 6,
   flickerChance = 0.3,
-  color = "rgb(0, 0, 0)",
+  color,
   width,
   height,
   className,
@@ -31,9 +31,55 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [resolvedColor, setResolvedColor] = useState<string>("rgb(0, 0, 0)");
+
+  const resolveColor = useCallback((colorValue: string | undefined): string => {
+    if (typeof window === "undefined") {
+      return "rgb(0, 0, 0)";
+    }
+
+    const colorToResolve = colorValue || "var(--foreground)";
+
+    if (colorToResolve.startsWith("var(")) {
+      const tempEl = document.createElement("div");
+      tempEl.style.color = colorToResolve;
+      tempEl.style.position = "absolute";
+      tempEl.style.visibility = "hidden";
+      document.body.appendChild(tempEl);
+      const computedColor = window.getComputedStyle(tempEl).color;
+      document.body.removeChild(tempEl);
+      return computedColor || "rgb(0, 0, 0)";
+    }
+
+    return colorToResolve;
+  }, []);
+
+  useEffect(() => {
+    const updateColor = () => {
+      const resolved = resolveColor(color);
+      setResolvedColor(resolved);
+    };
+
+    updateColor();
+
+    const observer = new MutationObserver(() => {
+      updateColor();
+    });
+
+    if (typeof window !== "undefined") {
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [color, resolveColor]);
 
   const memoizedColor = useMemo(() => {
-    const toRGBA = (color: string) => {
+    const toRGBA = (colorValue: string) => {
       if (typeof window === "undefined") {
         return `rgba(0, 0, 0,`;
       }
@@ -41,13 +87,13 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
       canvas.width = canvas.height = 1;
       const ctx = canvas.getContext("2d");
       if (!ctx) return "rgba(255, 0, 0,";
-      ctx.fillStyle = color;
+      ctx.fillStyle = colorValue;
       ctx.fillRect(0, 0, 1, 1);
       const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data);
       return `rgba(${r}, ${g}, ${b},`;
     };
-    return toRGBA(color);
-  }, [color]);
+    return toRGBA(resolvedColor);
+  }, [resolvedColor]);
 
   const setupCanvas = useCallback(
     (canvas: HTMLCanvasElement, width: number, height: number) => {
@@ -56,8 +102,8 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
       canvas.height = height * dpr;
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-      const cols = Math.ceil(width / (squareSize + gridGap));
-      const rows = Math.ceil(height / (squareSize + gridGap));
+      const cols = Math.floor(width / (squareSize + gridGap));
+      const rows = Math.floor(height / (squareSize + gridGap));
 
       const squares = new Float32Array(cols * rows);
       for (let i = 0; i < squares.length; i++) {
@@ -113,70 +159,66 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    const ctx = canvas?.getContext("2d") ?? null;
-    let animationFrameId: number | null = null;
-    let resizeObserver: ResizeObserver | null = null;
-    let intersectionObserver: IntersectionObserver | null = null;
-    let gridParams: ReturnType<typeof setupCanvas> | null = null;
+    if (!canvas || !container) return;
 
-    if (canvas && container && ctx) {
-      const updateCanvasSize = () => {
-        const newWidth = width || container.clientWidth;
-        const newHeight = height || container.clientHeight;
-        setCanvasSize({ width: newWidth, height: newHeight });
-        gridParams = setupCanvas(canvas, newWidth, newHeight);
-      };
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-      updateCanvasSize();
+    let animationFrameId: number;
+    let gridParams: ReturnType<typeof setupCanvas>;
 
-      let lastTime = 0;
-      const animate = (time: number) => {
-        if (!isInView || !gridParams) return;
+    const updateCanvasSize = () => {
+      const newWidth = width || container.clientWidth;
+      const newHeight = height || container.clientHeight;
+      setCanvasSize({ width: newWidth, height: newHeight });
+      gridParams = setupCanvas(canvas, newWidth, newHeight);
+    };
 
-        const deltaTime = (time - lastTime) / 1000;
-        lastTime = time;
+    updateCanvasSize();
 
-        updateSquares(gridParams.squares, deltaTime);
-        drawGrid(
-          ctx,
-          canvas.width,
-          canvas.height,
-          gridParams.cols,
-          gridParams.rows,
-          gridParams.squares,
-          gridParams.dpr,
-        );
-        animationFrameId = requestAnimationFrame(animate);
-      };
+    let lastTime = 0;
+    const animate = (time: number) => {
+      if (!isInView) return;
 
-      resizeObserver = new ResizeObserver(() => {
-        updateCanvasSize();
-      });
-      resizeObserver.observe(container);
+      const deltaTime = (time - lastTime) / 1000;
+      lastTime = time;
 
-      intersectionObserver = new IntersectionObserver(
-        ([entry]) => {
-          setIsInView(entry.isIntersecting);
-        },
-        { threshold: 0 },
+      updateSquares(gridParams.squares, deltaTime);
+      drawGrid(
+        ctx,
+        canvas.width,
+        canvas.height,
+        gridParams.cols,
+        gridParams.rows,
+        gridParams.squares,
+        gridParams.dpr,
       );
-      intersectionObserver.observe(canvas);
+      animationFrameId = requestAnimationFrame(animate);
+    };
 
-      if (isInView) {
-        animationFrameId = requestAnimationFrame(animate);
-      }
+    const resizeObserver = new ResizeObserver(() => {
+      updateCanvasSize();
+    });
+
+    resizeObserver.observe(container);
+
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0 },
+    );
+
+    intersectionObserver.observe(canvas);
+
+    if (isInView) {
+      animationFrameId = requestAnimationFrame(animate);
     }
 
     return () => {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-      }
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      if (intersectionObserver) {
-        intersectionObserver.disconnect();
-      }
+      cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
     };
   }, [setupCanvas, updateSquares, drawGrid, width, height, isInView]);
 

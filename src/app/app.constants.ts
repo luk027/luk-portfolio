@@ -8,3 +8,5 @@ export const navbarList = [
   { href: "/", icon: HomeIcon, label: "Home" },
   { href: "/project", icon: LayoutDashboard, label: "Project" },
 ];
+
+export const BLUR_FADE_DELAY = 0.04;
